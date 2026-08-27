@@ -1,0 +1,31 @@
+{
+  "name": "nihongo-study",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --experimental-sqlite ./node_modules/vite/bin/vite.js --port 3000 --host",
+    "vite": "node --experimental-sqlite ./node_modules/vite/bin/vite.js --port 3000 --host",
+    "build": "tsc -b && vite build",
+    "preview": "node --experimental-sqlite ./node_modules/vite/bin/vite.js preview --port 3000 --host"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.9",
+    "hono": "^4.11.9",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.13.0",
+    "wanakana": "^5.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}
