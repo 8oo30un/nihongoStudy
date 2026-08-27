@@ -78,6 +78,25 @@ CREATE TABLE IF NOT EXISTS setting (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS vocab (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  surface TEXT NOT NULL,
+  reading TEXT NOT NULL,
+  romaji TEXT NOT NULL,
+  ko_meaning TEXT NOT NULL DEFAULT '',
+  context_ko TEXT NOT NULL DEFAULT '',
+  context_jp TEXT NOT NULL DEFAULT '',
+  source_sentence_id INTEGER,
+  created_on TEXT NOT NULL,
+  UNIQUE(surface, reading)
+);
+
+CREATE TABLE IF NOT EXISTS meaning_cache (
+  query TEXT PRIMARY KEY,
+  ko_meaning TEXT NOT NULL,
+  source TEXT NOT NULL
+);
 `)
 
 const categoryCount = db.prepare('SELECT COUNT(*) AS n FROM category').get() as { n: number }
@@ -158,5 +177,31 @@ export function mapSentence(row: SentenceRow) {
     dueOn: row.due_on,
     lastReviewedOn: row.last_reviewed_on,
     reviewCount: row.review_count,
+  }
+}
+
+export type VocabRow = {
+  id: number
+  surface: string
+  reading: string
+  romaji: string
+  ko_meaning: string
+  context_ko: string
+  context_jp: string
+  source_sentence_id: number | null
+  created_on: string
+}
+
+export function mapVocab(row: VocabRow) {
+  return {
+    id: row.id,
+    surface: row.surface,
+    reading: row.reading,
+    romaji: row.romaji,
+    koMeaning: row.ko_meaning,
+    contextKo: row.context_ko,
+    contextJp: row.context_jp,
+    sourceSentenceId: row.source_sentence_id,
+    createdOn: row.created_on,
   }
 }

@@ -4,6 +4,7 @@ import { JapaneseTextarea } from '../components/JapaneseTextarea'
 import { SentenceCard } from '../components/SentenceCard'
 import { api } from '../lib/api'
 import { speakJapanese } from '../lib/tts'
+import { useAutoKorean } from '../lib/use-auto-korean'
 import type { Category, Sentence, TodayStats } from '../types'
 
 export function TodayPage() {
@@ -12,7 +13,7 @@ export function TodayPage() {
   const [sentences, setSentences] = useState<Sentence[]>([])
   const [jpKana, setJpKana] = useState('')
   const [jpKanji, setJpKanji] = useState('')
-  const [koText, setKoText] = useState('')
+  const { ko: koText, onKoChange, status: koStatus, reset: resetKo } = useAutoKorean(jpKana)
   const [categoryId, setCategoryId] = useState<number | ''>('')
   const [error, setError] = useState('')
   const [showKanji, setShowKanji] = useState(false)
@@ -43,7 +44,7 @@ export function TodayPage() {
       })
       setJpKana('')
       setJpKanji('')
-      setKoText('')
+      resetKo()
       setShowKanji(false)
       await reload()
     } catch (err) {
@@ -73,7 +74,7 @@ export function TodayPage() {
 
         <section>
           <p className="step-label">1 · 일본어</p>
-          <p className="meta mt-1">칸을 누르면 아래 가나 패드가 열립니다.</p>
+          <p className="meta mt-1">칸을 누르거나 패드를 연 뒤, 노트북 키보드로 ka 처럼 치면 か 가 입력됩니다.</p>
           <div className="mt-3">
             <JapaneseTextarea
               required
@@ -106,12 +107,20 @@ export function TodayPage() {
 
         <section>
           <p className="step-label">2 · 한글 뜻</p>
-          <p className="meta mt-1">찾기에서 이 글로 문장이 나옵니다.</p>
+          <p className="meta mt-1">
+            {koStatus === 'loading'
+              ? '일본어 뜻을 찾는 중입니다.'
+              : koStatus === 'auto'
+                ? '자동으로 넣었습니다. 이상하면 이 칸에서 고치면 됩니다.'
+                : koStatus === 'edited'
+                  ? '직접 고친 뜻입니다.'
+                  : '일본어를 적으면 한글 뜻이 먼저 들어옵니다.'}
+          </p>
           <input
             required
             className="ink-input mt-3"
             value={koText}
-            onChange={(e) => setKoText(e.target.value)}
+            onChange={(e) => onKoChange(e.target.value)}
             placeholder="오늘은 맑아요."
           />
         </section>

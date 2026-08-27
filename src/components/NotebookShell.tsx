@@ -8,6 +8,7 @@ const tabs = [
   { to: '/categories', label: 'category' },
   { to: '/review', label: 'review' },
   { to: '/diary', label: 'diary' },
+  { to: '/vocab', label: 'vocab' },
 ]
 
 function sectionLabel(pathname: string) {
@@ -15,6 +16,7 @@ function sectionLabel(pathname: string) {
   if (pathname.startsWith('/categories')) return 'category'
   if (pathname.startsWith('/review')) return 'review'
   if (pathname.startsWith('/diary')) return 'diary'
+  if (pathname.startsWith('/vocab')) return 'vocab'
   if (pathname.startsWith('/settings')) return 'setting'
   return 'today'
 }
@@ -80,7 +82,7 @@ export function NotebookShell() {
             to={tab.to}
             end={tab.to === '/'}
             className={({ isActive }) =>
-              `flex items-center justify-center py-3 font-ui text-[10px] tracking-[0.16em] lowercase ${
+              `flex items-center justify-center py-3 font-ui text-[9px] tracking-[0.1em] lowercase ${
                 isActive ? 'text-ink' : 'text-ink/40'
               }`
             }

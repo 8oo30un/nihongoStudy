@@ -218,10 +218,15 @@ input::placeholder {
   bottom: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   border-top: 1px solid rgb(255 255 255 / 0.2);
   background: rgb(163 181 192 / 0.95);
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+.meaning-panel {
+  border-top: 1px solid rgb(255 255 255 / 0.16);
+  padding-top: 0.85rem;
 }
 
 .desk-link {
@@ -251,7 +256,7 @@ input::placeholder {
   .desktop-nav {
     display: flex;
     align-items: baseline;
-    gap: 1.75rem;
+    gap: 1.25rem;
   }
 
   .mobile-setting,

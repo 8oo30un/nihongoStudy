@@ -46,3 +46,23 @@ export type TodayStats = {
   reviewCount: number
   diarySaved: boolean
 }
+
+export type Vocab = {
+  id: number
+  surface: string
+  reading: string
+  romaji: string
+  koMeaning: string
+  contextKo: string
+  contextJp: string
+  sourceSentenceId: number | null
+  createdOn: string
+  already?: boolean
+}
+
+export type MeaningSuggest = {
+  query: string
+  primary: string
+  alternatives: string[]
+  source: 'cache' | 'common' | 'jisho' | 'mt' | ''
+}

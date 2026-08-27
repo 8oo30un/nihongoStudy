@@ -8,6 +8,7 @@ import { ReviewPage } from './pages/ReviewPage'
 import { SearchPage } from './pages/SearchPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { TodayPage } from './pages/TodayPage'
+import { VocabPage } from './pages/VocabPage'
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
             <Route path="/categories/:id" element={<CategoryDetailPage />} />
             <Route path="/review" element={<ReviewPage />} />
             <Route path="/diary" element={<DiaryPage />} />
+            <Route path="/vocab" element={<VocabPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>

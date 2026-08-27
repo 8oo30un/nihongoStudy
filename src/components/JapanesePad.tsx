@@ -36,11 +36,14 @@ export function JapanesePad() {
 
   return (
     <section className="pad-sheet" aria-label="일본어 가상 키보드">
-      <div className="mb-3 flex items-center justify-between px-1">
-        <p className="font-ui text-[10px] tracking-[0.2em] text-ink/70 lowercase">kana pad</p>
+      <div className="mb-3 flex items-center justify-between gap-3 px-1">
+        <p className="font-ui text-[10px] tracking-[0.2em] text-ink/70 lowercase">
+          {open ? 'type ka → か' : 'kana pad'}
+        </p>
         <button
           type="button"
           className="quiet-link"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => setOpen(!open)}
         >
           {open ? 'close' : 'open'}

@@ -7,14 +7,14 @@ type Props = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 }
 
 export function JapaneseTextarea({ lined, className = '', onChange, onFocus, ...props }: Props) {
-  const { register, flash, setOpen } = usePad()
+  const { register, flash, setOpen, open } = usePad()
   const ref = useRef<HTMLTextAreaElement>(null)
   const last = useRef('')
 
   useEffect(() => {
-    return () => {
-      if (ref.current) register(null)
-    }
+    const el = ref.current
+    if (el) register(el)
+    return () => register(null)
   }, [register])
 
   return (
@@ -36,12 +36,14 @@ export function JapaneseTextarea({ lined, className = '', onChange, onFocus, ...
       }}
       onChange={(e) => {
         const el = e.currentTarget
-        const converted = toKana(el.value, { IMEMode: true })
-        if (converted !== el.value) {
-          const extra = converted.length - el.value.length
-          const pos = (el.selectionStart ?? converted.length) + extra
-          el.value = converted
-          el.setSelectionRange(pos, pos)
+        if (!open) {
+          const converted = toKana(el.value, { IMEMode: true })
+          if (converted !== el.value) {
+            const extra = converted.length - el.value.length
+            const pos = (el.selectionStart ?? converted.length) + extra
+            el.value = converted
+            el.setSelectionRange(pos, pos)
+          }
         }
         const next = el.value
         if (next.length >= last.current.length) {

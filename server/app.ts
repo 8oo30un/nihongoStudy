@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
-import { db, mapSentence, type SentenceRow } from './db.ts'
+import { db, mapSentence, mapVocab, type SentenceRow, type VocabRow } from './db.ts'
+import { suggestMeaning, suggestSentence } from './suggest.ts'
 import { addDays, escapeLike, searchVariants, todaySeoul } from './util.ts'
 
 const sentenceSelect = `
@@ -245,6 +246,95 @@ export function createApp() {
       koNote: row.ko_note,
       correctionJson: row.correction_json,
     })
+  })
+
+  app.get('/api/suggest', async (c) => {
+    const q = c.req.query('q')?.trim() ?? ''
+    if (!q) return c.json({ query: '', primary: '', alternatives: [], source: '' })
+    if (c.req.query('kind') === 'sentence') {
+      return c.json(await suggestSentence(q))
+    }
+    return c.json(await suggestMeaning(q))
+  })
+
+  app.get('/api/vocab', (c) => {
+    const q = c.req.query('q')?.trim() ?? ''
+    let sql = 'SELECT * FROM vocab'
+    const params: string[] = []
+    if (q) {
+      sql += ` WHERE surface LIKE ? ESCAPE '\\' OR reading LIKE ? ESCAPE '\\' OR romaji LIKE ? ESCAPE '\\' OR ko_meaning LIKE ? ESCAPE '\\' OR context_ko LIKE ? ESCAPE '\\'`
+      const like = `%${escapeLike(q)}%`
+      params.push(like, like, like, like, like)
+    }
+    sql += ' ORDER BY id DESC'
+    const rows = db.prepare(sql).all(...params) as VocabRow[]
+    return c.json(rows.map(mapVocab))
+  })
+
+  app.post('/api/vocab', async (c) => {
+    const body = await c.req.json<{
+      surface: string
+      reading?: string
+      romaji: string
+      koMeaning?: string
+      contextKo?: string
+      contextJp?: string
+      sourceSentenceId?: number | null
+    }>()
+    const surface = body.surface?.trim()
+    const romaji = body.romaji?.trim()
+    if (!surface || !romaji) {
+      return c.json({ error: '단어와 로마자가 필요합니다.' }, 400)
+    }
+    const reading = body.reading?.trim() || surface
+    let koMeaning = body.koMeaning?.trim() ?? ''
+    if (!koMeaning) {
+      const suggested = await suggestMeaning(surface)
+      koMeaning = suggested.primary
+    }
+    const today = todaySeoul(getSettings().timezone)
+    const existing = db
+      .prepare('SELECT * FROM vocab WHERE surface = ? AND reading = ?')
+      .get(surface, reading) as VocabRow | undefined
+    if (existing) {
+      return c.json({ ...mapVocab(existing), already: true })
+    }
+    const info = db
+      .prepare(
+        `INSERT INTO vocab (surface, reading, romaji, ko_meaning, context_ko, context_jp, source_sentence_id, created_on)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        surface,
+        reading,
+        romaji,
+        koMeaning,
+        body.contextKo?.trim() ?? '',
+        body.contextJp?.trim() ?? '',
+        body.sourceSentenceId ?? null,
+        today,
+      )
+    const row = db.prepare('SELECT * FROM vocab WHERE id = ?').get(info.lastInsertRowid) as VocabRow
+    return c.json(mapVocab(row), 201)
+  })
+
+  app.patch('/api/vocab/:id', async (c) => {
+    const id = Number(c.req.param('id'))
+    const existing = db.prepare('SELECT * FROM vocab WHERE id = ?').get(id) as VocabRow | undefined
+    if (!existing) return c.json({ error: '없는 단어입니다.' }, 404)
+    const body = await c.req.json<{ koMeaning?: string }>()
+    db.prepare('UPDATE vocab SET ko_meaning = ? WHERE id = ?').run(
+      body.koMeaning?.trim() ?? existing.ko_meaning,
+      id,
+    )
+    const row = db.prepare('SELECT * FROM vocab WHERE id = ?').get(id) as VocabRow
+    return c.json(mapVocab(row))
+  })
+
+  app.delete('/api/vocab/:id', (c) => {
+    const id = Number(c.req.param('id'))
+    db.prepare('DELETE FROM vocab WHERE id = ?').run(id)
+    return c.json({ ok: true })
   })
 
   app.put('/api/diary/:date', async (c) => {

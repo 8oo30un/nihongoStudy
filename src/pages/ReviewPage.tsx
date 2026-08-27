@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
+import { toSentenceRomaji } from '../lib/analyze'
 import { speakJapanese } from '../lib/tts'
 import type { Sentence, TodayStats } from '../types'
 
@@ -54,10 +55,15 @@ export function ReviewPage() {
           <p className="mt-2 font-jp text-[12px] text-ink/60">{current.jpKanji}</p>
         )}
         {reveal ? (
-          <p className="mt-6 text-[15px] leading-relaxed text-ink/85">{current.koText}</p>
+          <div className="mt-6">
+            <p className="text-[15px] leading-relaxed text-ink/85">{current.koText}</p>
+            <p className="mt-2 font-ui text-[12px] tracking-[0.04em] text-ink/70">
+              {toSentenceRomaji(current.jpKana)}
+            </p>
+          </div>
         ) : (
           <button type="button" className="quiet-link mt-6" onClick={() => setReveal(true)}>
-            show korean
+            한국어 뜻 · 로마자
           </button>
         )}
         <button
