@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
+import { toRomaji } from 'wanakana'
 import { db, mapSentence, mapVocab, type SentenceRow, type VocabRow } from './db.ts'
-import { suggestMeaning, suggestSentence } from './suggest.ts'
+import { suggestJapanese, suggestMeaning, suggestSentence } from './suggest.ts'
 import { addDays, escapeLike, searchVariants, todaySeoul } from './util.ts'
 
 const sentenceSelect = `
@@ -58,6 +59,21 @@ export function createApp() {
       reviewCount,
       diarySaved: Boolean(diary),
     })
+  })
+
+  app.get('/api/diaries', (c) => {
+    const month = c.req.query('month')?.trim() ?? ''
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      return c.json({ error: 'month=YYYY-MM 이 필요합니다.' }, 400)
+    }
+    const rows = db
+      .prepare(
+        `SELECT date FROM diary_entry
+         WHERE date LIKE ?
+           AND (TRIM(jp_kana) != '' OR TRIM(IFNULL(jp_kanji, '')) != '' OR TRIM(ko_note) != '')`,
+      )
+      .all(`${month}-%`) as { date: string }[]
+    return c.json(rows.map((row) => row.date))
   })
 
   app.get('/api/categories', (c) => {
@@ -254,6 +270,9 @@ export function createApp() {
     if (c.req.query('kind') === 'sentence') {
       return c.json(await suggestSentence(q))
     }
+    if (c.req.query('kind') === 'japanese') {
+      return c.json(await suggestJapanese(q))
+    }
     return c.json(await suggestMeaning(q))
   })
 
@@ -282,11 +301,11 @@ export function createApp() {
       sourceSentenceId?: number | null
     }>()
     const surface = body.surface?.trim()
-    const romaji = body.romaji?.trim()
-    if (!surface || !romaji) {
-      return c.json({ error: '단어와 로마자가 필요합니다.' }, 400)
+    if (!surface) {
+      return c.json({ error: '단어가 필요합니다.' }, 400)
     }
     const reading = body.reading?.trim() || surface
+    const romaji = body.romaji?.trim() || toRomaji(surface)
     let koMeaning = body.koMeaning?.trim() ?? ''
     if (!koMeaning) {
       const suggested = await suggestMeaning(surface)

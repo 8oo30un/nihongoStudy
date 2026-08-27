@@ -4,9 +4,10 @@ import { usePad } from '../lib/pad-context'
 
 type Props = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   lined?: boolean
+  compact?: boolean
 }
 
-export function JapaneseTextarea({ lined, className = '', onChange, onFocus, ...props }: Props) {
+export function JapaneseTextarea({ lined, compact, className = '', onChange, onFocus, ...props }: Props) {
   const { register, flash, setOpen, open } = usePad()
   const ref = useRef<HTMLTextAreaElement>(null)
   const last = useRef('')
@@ -27,7 +28,7 @@ export function JapaneseTextarea({ lined, className = '', onChange, onFocus, ...
       autoCorrect="off"
       spellCheck={false}
       className={`w-full resize-y bg-transparent font-jp text-[1.15rem] leading-8 text-ink outline-none placeholder:text-ink/35 ${
-        lined ? 'lined-area min-h-[9rem]' : 'min-h-[4.5rem]'
+        lined ? 'lined-area min-h-[9rem]' : compact ? 'min-h-[2.75rem] resize-none' : 'min-h-[4.5rem]'
       } ${className}`}
       onFocus={(e) => {
         register(e.currentTarget)

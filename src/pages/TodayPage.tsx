@@ -4,16 +4,15 @@ import { JapaneseTextarea } from '../components/JapaneseTextarea'
 import { SentenceCard } from '../components/SentenceCard'
 import { api } from '../lib/api'
 import { speakJapanese } from '../lib/tts'
-import { useAutoKorean } from '../lib/use-auto-korean'
+import { useLinkedTranslation } from '../lib/use-linked-translation'
 import type { Category, Sentence, TodayStats } from '../types'
 
 export function TodayPage() {
   const [stats, setStats] = useState<TodayStats | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [sentences, setSentences] = useState<Sentence[]>([])
-  const [jpKana, setJpKana] = useState('')
   const [jpKanji, setJpKanji] = useState('')
-  const { ko: koText, onKoChange, status: koStatus, reset: resetKo } = useAutoKorean(jpKana)
+  const { jp: jpKana, ko: koText, onJpChange, onKoChange, reset, status } = useLinkedTranslation()
   const [categoryId, setCategoryId] = useState<number | ''>('')
   const [error, setError] = useState('')
   const [showKanji, setShowKanji] = useState(false)
@@ -42,9 +41,8 @@ export function TodayPage() {
         koText,
         categoryId,
       })
-      setJpKana('')
       setJpKanji('')
-      resetKo()
+      reset()
       setShowKanji(false)
       await reload()
     } catch (err) {
@@ -74,12 +72,16 @@ export function TodayPage() {
 
         <section>
           <p className="step-label">1 · 일본어</p>
-          <p className="meta mt-1">칸을 누르거나 패드를 연 뒤, 노트북 키보드로 ka 처럼 치면 か 가 입력됩니다.</p>
+          <p className="meta mt-1">
+            {status === 'to-jp'
+              ? '한글 뜻을 일본어로 맞추는 중입니다.'
+              : '칸을 누르거나 패드를 연 뒤, 노트북 키보드로 ka 처럼 치면 か 가 입력됩니다. 한글을 먼저 적어도 됩니다.'}
+          </p>
           <div className="mt-3">
             <JapaneseTextarea
               required
               value={jpKana}
-              onChange={(e) => setJpKana(e.target.value)}
+              onChange={(e) => onJpChange(e.target.value)}
               placeholder="きょうは はれです。"
             />
           </div>
@@ -108,13 +110,9 @@ export function TodayPage() {
         <section>
           <p className="step-label">2 · 한글 뜻</p>
           <p className="meta mt-1">
-            {koStatus === 'loading'
-              ? '일본어 뜻을 찾는 중입니다.'
-              : koStatus === 'auto'
-                ? '자동으로 넣었습니다. 이상하면 이 칸에서 고치면 됩니다.'
-                : koStatus === 'edited'
-                  ? '직접 고친 뜻입니다.'
-                  : '일본어를 적으면 한글 뜻이 먼저 들어옵니다.'}
+            {status === 'to-ko'
+              ? '일본어를 한글로 맞추는 중입니다.'
+              : '한쪽을 고치면 다른 쪽도 맞춰집니다.'}
           </p>
           <input
             required

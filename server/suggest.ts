@@ -1,6 +1,7 @@
 import { toHiragana } from 'wanakana'
 import { analyzeJapanese } from '../src/lib/analyze.ts'
 import { db } from './db.ts'
+import { toReadingKana } from './to-kana.ts'
 
 const COMMON: Record<string, string> = {
   する: '하다',
@@ -250,6 +251,78 @@ export async function suggestMeaning(surface: string): Promise<MeaningSuggest> {
 
 function sentenceKey(query: string) {
   return `s:${query}`
+}
+
+function looksJapanese(text: string) {
+  return /[\u3040-\u30ff\u4e00-\u9faf]/.test(text)
+}
+
+async function cleanupJa(text: string) {
+  const next = text.trim()
+  if (!next) return ''
+  if (!looksJapanese(next)) return ''
+  if (/[가-힣]/.test(next)) return ''
+  return toReadingKana(next)
+}
+
+async function translateKoJa(korean: string) {
+  const q = korean.trim()
+  if (!q) return ''
+  const data = await fetchJson<{ responseData?: { translatedText?: string } }>(
+    `https://api.mymemory.translated.net/get?${new URLSearchParams({ q, langpair: 'ko|ja' })}`,
+  )
+  return cleanupJa(data?.responseData?.translatedText ?? '')
+}
+
+function reverseCommon(korean: string) {
+  const q = korean.trim()
+  if (!q) return ''
+  let kanji = ''
+  for (const [jp, ko] of Object.entries(COMMON)) {
+    if (ko !== q) continue
+    if (!/[\u4e00-\u9faf]/.test(jp)) return jp
+    if (!kanji) kanji = jp
+  }
+  return kanji
+}
+
+function japaneseKey(query: string) {
+  return `j:${query}`
+}
+
+export async function suggestJapanese(text: string): Promise<MeaningSuggest> {
+  const query = text.trim()
+  if (!query || !/[가-힣]/.test(query)) {
+    return { query, primary: '', alternatives: [], source: '' }
+  }
+
+  const cacheId = japaneseKey(query)
+  const cached = lookupCache(cacheId)
+  if (cached?.ko_meaning) {
+    const primary = await toReadingKana(cached.ko_meaning)
+    if (primary !== cached.ko_meaning) saveCache(cacheId, primary, cached.source)
+    return {
+      query,
+      primary,
+      alternatives: uniqueMeanings([primary]),
+      source: (cached.source as MeaningSuggest['source']) || 'cache',
+    }
+  }
+
+  const fromCommon = reverseCommon(query)
+  if (fromCommon) {
+    const primary = await toReadingKana(fromCommon)
+    saveCache(cacheId, primary, 'common')
+    return { query, primary, alternatives: [primary], source: 'common' }
+  }
+
+  const fromMt = await translateKoJa(query)
+  if (fromMt) {
+    saveCache(cacheId, fromMt, 'mt')
+    return { query, primary: fromMt, alternatives: [fromMt], source: 'mt' }
+  }
+
+  return { query, primary: '', alternatives: [], source: '' }
 }
 
 export async function suggestSentence(text: string): Promise<MeaningSuggest> {

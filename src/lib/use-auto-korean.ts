@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from './api'
 
-export function useAutoKorean(jp: string) {
+export function useAutoKorean(jp: string, kind?: 'sentence') {
   const [ko, setKo] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'auto' | 'edited'>('idle')
   const autoRef = useRef('')
@@ -45,7 +45,7 @@ export function useAutoKorean(jp: string) {
     setStatus('loading')
     const timer = window.setTimeout(() => {
       void api
-        .suggest(q, 'sentence')
+        .suggest(q, kind)
         .then((found) => {
           if (id !== requestRef.current || editedRef.current) return
           if (found.primary) {
@@ -63,7 +63,7 @@ export function useAutoKorean(jp: string) {
     }, 480)
 
     return () => window.clearTimeout(timer)
-  }, [jp])
+  }, [jp, kind])
 
   return { ko, onKoChange, status, reset }
 }

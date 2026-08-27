@@ -48,6 +48,7 @@ export const api = {
   deleteSentence: (id: number) => request<{ ok: boolean }>(`/api/sentences/${id}`, { method: 'DELETE' }),
   search: (q: string) => request<Sentence[]>(`/api/search?q=${encodeURIComponent(q)}`),
   diary: (date: string) => request<DiaryEntry>(`/api/diary/${date}`),
+  diaryDates: (month: string) => request<string[]>(`/api/diaries?month=${encodeURIComponent(month)}`),
   saveDiary: (date: string, body: { jpKana: string; jpKanji?: string | null; koNote: string }) =>
     request<DiaryEntry>(`/api/diary/${date}`, { method: 'PUT', body: JSON.stringify(body) }),
   vocab: (q?: string) =>
@@ -64,8 +65,8 @@ export const api = {
   patchVocab: (id: number, body: { koMeaning: string }) =>
     request<Vocab>(`/api/vocab/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteVocab: (id: number) => request<{ ok: boolean }>(`/api/vocab/${id}`, { method: 'DELETE' }),
-  suggest: (q: string, kind?: 'sentence') =>
+  suggest: (q: string, kind?: 'sentence' | 'japanese') =>
     request<MeaningSuggest>(
-      `/api/suggest?q=${encodeURIComponent(q)}${kind === 'sentence' ? '&kind=sentence' : ''}`,
+      `/api/suggest?q=${encodeURIComponent(q)}${kind ? `&kind=${kind}` : ''}`,
     ),
 }
