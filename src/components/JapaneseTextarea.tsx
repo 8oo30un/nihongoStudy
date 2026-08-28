@@ -1,5 +1,5 @@
 import { useEffect, useRef, type TextareaHTMLAttributes } from 'react'
-import { toKana } from 'wanakana'
+import { applyImeKana } from '../lib/kana'
 import { usePad } from '../lib/pad-context'
 
 type Props = TextareaHTMLAttributes<HTMLTextAreaElement> & {
@@ -38,12 +38,12 @@ export function JapaneseTextarea({ lined, compact, className = '', onChange, onF
       onChange={(e) => {
         const el = e.currentTarget
         if (!open) {
-          const converted = toKana(el.value, { IMEMode: true })
+          const cursor = el.selectionStart ?? el.value.length
+          const convertedBefore = applyImeKana(el.value.slice(0, cursor))
+          const converted = convertedBefore + el.value.slice(cursor)
           if (converted !== el.value) {
-            const extra = converted.length - el.value.length
-            const pos = (el.selectionStart ?? converted.length) + extra
             el.value = converted
-            el.setSelectionRange(pos, pos)
+            el.setSelectionRange(convertedBefore.length, convertedBefore.length)
           }
         }
         const next = el.value

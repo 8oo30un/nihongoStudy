@@ -1,3 +1,5 @@
+import { toKana } from 'wanakana'
+
 export const DAKUTEN: Record<string, string> = {
   か: 'が',
   き: 'ぎ',
@@ -102,6 +104,17 @@ export const GOJUON = [
 
 export function toKatakanaChar(kana: string) {
   return kana.replace(/[\u3041-\u3096]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60))
+}
+
+const ROMAJI_TAIL = /[a-zA-Z'\-]+$/
+
+/** 지금 치는 로마자만 가나로 바꾼다. 이미 적은 히라가나·가타카나는 그대로 둔다. */
+export function applyImeKana(beforeCursor: string, inserted = '', katakana = false) {
+  const match = beforeCursor.match(ROMAJI_TAIL)
+  const committed = match ? beforeCursor.slice(0, -match[0].length) : beforeCursor
+  const pending = (match ? match[0] : '') + inserted
+  if (!pending) return committed
+  return committed + toKana(pending, { IMEMode: katakana ? 'toKatakana' : true })
 }
 
 export function applyMap(text: string, table: Record<string, string>) {

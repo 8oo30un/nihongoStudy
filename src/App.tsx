@@ -7,6 +7,7 @@ import { DiaryPage } from './pages/DiaryPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { SearchPage } from './pages/SearchPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { TestPage } from './pages/TestPage'
 import { TodayPage } from './pages/TodayPage'
 import { VocabPage } from './pages/VocabPage'
 
@@ -17,6 +18,7 @@ export function App() {
         <Routes>
           <Route element={<NotebookShell />}>
             <Route path="/" element={<TodayPage />} />
+            <Route path="/test" element={<TestPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/categories/:id" element={<CategoryDetailPage />} />

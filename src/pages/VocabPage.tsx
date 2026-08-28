@@ -117,6 +117,7 @@ export function VocabPage() {
               </button>
             </div>
             <p className="mt-1 font-ui text-[12px] tracking-[0.04em] text-ink/70">{item.romaji}</p>
+            {item.missCount > 0 && <p className="meta mt-1">틀림 {item.missCount}</p>}
             {editingId === item.id ? (
               <div className="mt-3 flex flex-wrap items-end gap-3">
                 <input

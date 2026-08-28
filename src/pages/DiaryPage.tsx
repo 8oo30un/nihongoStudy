@@ -195,7 +195,7 @@ export function DiaryPage() {
               ? '한글을 일본어로 맞추는 중입니다.'
               : status === 'to-ko'
                 ? '일본어를 한글로 맞추는 중입니다.'
-                : '한쪽을 적거나 고치면 다른 쪽도 맞춰집니다.'}
+                : '직접 적은 칸은 그대로 두고, 비어 있거나 자동으로 넣은 칸만 맞춥니다.'}
           </span>
         </label>
         <label className="block">

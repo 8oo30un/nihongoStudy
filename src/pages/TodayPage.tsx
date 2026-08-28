@@ -112,7 +112,7 @@ export function TodayPage() {
           <p className="meta mt-1">
             {status === 'to-ko'
               ? '일본어를 한글로 맞추는 중입니다.'
-              : '한쪽을 고치면 다른 쪽도 맞춰집니다.'}
+              : '직접 고친 뜻은 그대로 둡니다. 비어 있으면 일본어에 맞춰 넣습니다.'}
           </p>
           <input
             required
@@ -152,9 +152,6 @@ export function TodayPage() {
           <SentenceCard
             key={sentence.id}
             sentence={sentence}
-            onMark={(selfMark) => {
-              void api.patchSentence(sentence.id, { selfMark }).then(() => reload())
-            }}
             onDelete={() => {
               void api.deleteSentence(sentence.id).then(() => reload())
             }}

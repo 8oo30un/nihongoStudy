@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { toRomaji } from 'wanakana'
 import { db, mapSentence, mapVocab, type SentenceRow, type VocabRow } from './db.ts'
 import { suggestJapanese, suggestMeaning, suggestSentence } from './suggest.ts'
+import { buildQuiz, gradeQuizAnswer } from './quiz.ts'
 import { addDays, escapeLike, searchVariants, todaySeoul } from './util.ts'
 
 const sentenceSelect = `
@@ -47,9 +48,14 @@ export function createApp() {
       db.prepare('SELECT COUNT(*) AS n FROM sentence WHERE created_on = ?').get(today) as { n: number }
     ).n
     const reviewCount = (
-      db.prepare(`SELECT COUNT(*) AS n FROM sentence WHERE due_on IS NOT NULL AND due_on <= ?`).get(today) as {
-        n: number
-      }
+      db
+        .prepare(
+          `SELECT
+             (SELECT COUNT(*) FROM sentence WHERE due_on IS NOT NULL AND due_on <= ?) +
+             (SELECT COUNT(*) FROM vocab WHERE due_on IS NOT NULL AND due_on <= ?)
+           AS n`,
+        )
+        .get(today, today) as { n: number }
     ).n
     const diary = db.prepare('SELECT id FROM diary_entry WHERE date = ?').get(today)
     return c.json({
@@ -163,10 +169,12 @@ export function createApp() {
     let dueOn = existing.due_on
     let lastReviewed = existing.last_reviewed_on
     let reviewCount = existing.review_count
+    let missCount = existing.miss_count ?? 0
     if (body.selfMark === 'wrong') {
       dueOn = addDays(today, 1, getSettings().timezone)
       lastReviewed = today
       reviewCount += 1
+      missCount += 1
     }
     if (body.selfMark === 'ok') {
       dueOn = null
@@ -183,7 +191,8 @@ export function createApp() {
         self_mark = ?,
         due_on = ?,
         last_reviewed_on = ?,
-        review_count = ?
+        review_count = ?,
+        miss_count = ?
       WHERE id = ?`,
     ).run(
       body.jpKana?.trim() ?? existing.jp_kana,
@@ -195,6 +204,7 @@ export function createApp() {
       dueOn,
       lastReviewed,
       reviewCount,
+      missCount,
       id,
     )
     const row = db.prepare(`${sentenceSelect} WHERE s.id = ?`).get(id) as SentenceRow
@@ -276,15 +286,51 @@ export function createApp() {
     return c.json(await suggestMeaning(q))
   })
 
+  app.get('/api/quiz', (c) => {
+    const limit = Number(c.req.query('count') ?? 10)
+    const questions = buildQuiz(Number.isFinite(limit) ? limit : 10)
+    return c.json({ questions })
+  })
+
+  app.post('/api/quiz/answer', async (c) => {
+    const body = await c.req.json<{
+      kind?: 'sentence' | 'vocab'
+      itemId?: number
+      direction?: 'jp-ko' | 'ko-jp'
+      choice?: string
+    }>()
+    if (!body.kind || !body.itemId || !body.direction || body.choice == null) {
+      return c.json({ error: '보기와 문항이 필요합니다.' }, 400)
+    }
+    const graded = gradeQuizAnswer({
+      kind: body.kind,
+      itemId: body.itemId,
+      direction: body.direction,
+      choice: body.choice,
+      timezone: getSettings().timezone,
+    })
+    if (!graded) return c.json({ error: '없는 문항입니다.' }, 404)
+    return c.json(graded)
+  })
+
   app.get('/api/vocab', (c) => {
     const q = c.req.query('q')?.trim() ?? ''
+    const due = c.req.query('due')?.trim() ?? ''
     let sql = 'SELECT * FROM vocab'
     const params: string[] = []
+    const where: string[] = []
     if (q) {
-      sql += ` WHERE surface LIKE ? ESCAPE '\\' OR reading LIKE ? ESCAPE '\\' OR romaji LIKE ? ESCAPE '\\' OR ko_meaning LIKE ? ESCAPE '\\' OR context_ko LIKE ? ESCAPE '\\'`
+      where.push(
+        `(surface LIKE ? ESCAPE '\\' OR reading LIKE ? ESCAPE '\\' OR romaji LIKE ? ESCAPE '\\' OR ko_meaning LIKE ? ESCAPE '\\' OR context_ko LIKE ? ESCAPE '\\')`,
+      )
       const like = `%${escapeLike(q)}%`
       params.push(like, like, like, like, like)
     }
+    if (due) {
+      where.push('due_on IS NOT NULL AND due_on <= ?')
+      params.push(due)
+    }
+    if (where.length) sql += ` WHERE ${where.join(' AND ')}`
     sql += ' ORDER BY id DESC'
     const rows = db.prepare(sql).all(...params) as VocabRow[]
     return c.json(rows.map(mapVocab))
@@ -341,11 +387,23 @@ export function createApp() {
     const id = Number(c.req.param('id'))
     const existing = db.prepare('SELECT * FROM vocab WHERE id = ?').get(id) as VocabRow | undefined
     if (!existing) return c.json({ error: '없는 단어입니다.' }, 404)
-    const body = await c.req.json<{ koMeaning?: string }>()
-    db.prepare('UPDATE vocab SET ko_meaning = ? WHERE id = ?').run(
-      body.koMeaning?.trim() ?? existing.ko_meaning,
-      id,
-    )
+    const body = await c.req.json<{ koMeaning?: string; selfMark?: 'ok' | 'wrong' }>()
+    const today = todaySeoul(getSettings().timezone)
+    let missCount = existing.miss_count ?? 0
+    let dueOn = existing.due_on
+    let lastReviewed = existing.last_reviewed_on
+    if (body.selfMark === 'wrong') {
+      missCount += 1
+      dueOn = addDays(today, 1, getSettings().timezone)
+      lastReviewed = today
+    }
+    if (body.selfMark === 'ok') {
+      dueOn = null
+      lastReviewed = today
+    }
+    db.prepare(
+      `UPDATE vocab SET ko_meaning = ?, miss_count = ?, due_on = ?, last_reviewed_on = ? WHERE id = ?`,
+    ).run(body.koMeaning?.trim() ?? existing.ko_meaning, missCount, dueOn, lastReviewed, id)
     const row = db.prepare('SELECT * FROM vocab WHERE id = ?').get(id) as VocabRow
     return c.json(mapVocab(row))
   })

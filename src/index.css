@@ -116,6 +116,34 @@ input::placeholder {
   color: #fff;
 }
 
+.choice-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-kr);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  padding: 0.7rem 0;
+  border: none;
+  border-bottom: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+}
+
+.choice-btn:disabled {
+  opacity: 1;
+}
+
+.choice-btn.is-correct {
+  color: #fff;
+  border-bottom-color: #fff;
+}
+
+.choice-btn.is-wrong {
+  opacity: 0.45;
+}
+
 .pad-sheet {
   background: #8298a5;
   border: none;
@@ -218,7 +246,7 @@ input::placeholder {
   bottom: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   border-top: 1px solid rgb(255 255 255 / 0.2);
   background: rgb(163 181 192 / 0.95);
   padding-bottom: env(safe-area-inset-bottom);

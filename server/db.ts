@@ -62,7 +62,8 @@ CREATE TABLE IF NOT EXISTS sentence (
   self_mark TEXT NOT NULL DEFAULT 'unset',
   due_on TEXT,
   last_reviewed_on TEXT,
-  review_count INTEGER NOT NULL DEFAULT 0
+  review_count INTEGER NOT NULL DEFAULT 0,
+  miss_count INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS diary_entry (
@@ -89,6 +90,9 @@ CREATE TABLE IF NOT EXISTS vocab (
   context_jp TEXT NOT NULL DEFAULT '',
   source_sentence_id INTEGER,
   created_on TEXT NOT NULL,
+  miss_count INTEGER NOT NULL DEFAULT 0,
+  due_on TEXT,
+  last_reviewed_on TEXT,
   UNIQUE(surface, reading)
 );
 
@@ -98,6 +102,20 @@ CREATE TABLE IF NOT EXISTS meaning_cache (
   source TEXT NOT NULL
 );
 `)
+
+function tableColumns(table: string) {
+  return (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((row) => row.name)
+}
+
+function ensureColumn(table: string, name: string, definition: string) {
+  if (tableColumns(table).includes(name)) return
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`)
+}
+
+ensureColumn('sentence', 'miss_count', 'INTEGER NOT NULL DEFAULT 0')
+ensureColumn('vocab', 'miss_count', 'INTEGER NOT NULL DEFAULT 0')
+ensureColumn('vocab', 'due_on', 'TEXT')
+ensureColumn('vocab', 'last_reviewed_on', 'TEXT')
 
 const categoryCount = db.prepare('SELECT COUNT(*) AS n FROM category').get() as { n: number }
 
@@ -158,6 +176,7 @@ export type SentenceRow = {
   due_on: string | null
   last_reviewed_on: string | null
   review_count: number
+  miss_count: number
   category_name?: string
   category_emoji?: string
 }
@@ -177,6 +196,7 @@ export function mapSentence(row: SentenceRow) {
     dueOn: row.due_on,
     lastReviewedOn: row.last_reviewed_on,
     reviewCount: row.review_count,
+    missCount: row.miss_count ?? 0,
   }
 }
 
@@ -190,6 +210,9 @@ export type VocabRow = {
   context_jp: string
   source_sentence_id: number | null
   created_on: string
+  miss_count: number
+  due_on: string | null
+  last_reviewed_on: string | null
 }
 
 export function mapVocab(row: VocabRow) {
@@ -203,5 +226,8 @@ export function mapVocab(row: VocabRow) {
     contextJp: row.context_jp,
     sourceSentenceId: row.source_sentence_id,
     createdOn: row.created_on,
+    missCount: row.miss_count ?? 0,
+    dueOn: row.due_on ?? null,
+    lastReviewedOn: row.last_reviewed_on ?? null,
   }
 }

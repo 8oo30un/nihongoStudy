@@ -77,6 +77,12 @@ export function SentenceCard({
           {sentence.createdOn}
           <span className="mx-2 opacity-50">/</span>
           {sentence.categoryName}
+          {(sentence.missCount ?? 0) > 0 && (
+            <>
+              <span className="mx-2 opacity-50">/</span>
+              틀림 {sentence.missCount}
+            </>
+          )}
         </p>
         <button
           type="button"

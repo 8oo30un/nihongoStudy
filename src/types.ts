@@ -22,6 +22,7 @@ export type Sentence = {
   dueOn: string | null
   lastReviewedOn: string | null
   reviewCount: number
+  missCount: number
 }
 
 export type DiaryEntry = {
@@ -57,7 +58,28 @@ export type Vocab = {
   contextJp: string
   sourceSentenceId: number | null
   createdOn: string
+  missCount: number
+  dueOn: string | null
+  lastReviewedOn: string | null
   already?: boolean
+}
+
+export type QuizKind = 'sentence' | 'vocab'
+export type QuizDirection = 'jp-ko' | 'ko-jp'
+
+export type QuizQuestion = {
+  kind: QuizKind
+  itemId: number
+  direction: QuizDirection
+  prompt: string
+  promptLang: 'jp' | 'ko'
+  choices: string[]
+}
+
+export type QuizGrade = {
+  correct: boolean
+  answer: string
+  missCount: number
 }
 
 export type MeaningSuggest = {

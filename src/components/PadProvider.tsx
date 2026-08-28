@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { toKana } from 'wanakana'
+import { applyImeKana } from '../lib/kana'
 import { PadContext, type JapaneseField } from '../lib/pad-context'
 
 function writeField(el: JapaneseField, next: string, cursor: number) {
@@ -98,11 +98,9 @@ export function PadProvider({ children }: { children: ReactNode }) {
       }
 
       const raw = space ? ' ' : katakanaRef.current ? e.key.toUpperCase() : e.key.toLowerCase()
-      const nextRaw = el.value.slice(0, start) + raw + after
-      const converted = toKana(nextRaw, { IMEMode: katakanaRef.current ? 'toKatakana' : true })
-      const cursor = Math.max(0, converted.length - after.length)
-      writeField(el, converted, cursor)
-      const added = converted.slice(0, cursor)
+      const convertedBefore = applyImeKana(el.value.slice(0, start), raw, katakanaRef.current)
+      writeField(el, convertedBefore + after, convertedBefore.length)
+      const added = convertedBefore
       const ch = [...added].at(-1)
       if (ch && ch !== ' ') flash(ch)
     }

@@ -4,6 +4,7 @@ import { JapanesePad } from './JapanesePad'
 
 const tabs = [
   { to: '/', label: 'today' },
+  { to: '/test', label: 'test' },
   { to: '/search', label: 'search' },
   { to: '/categories', label: 'category' },
   { to: '/review', label: 'review' },
@@ -12,6 +13,7 @@ const tabs = [
 ]
 
 function sectionLabel(pathname: string) {
+  if (pathname.startsWith('/test')) return 'test'
   if (pathname.startsWith('/search')) return 'search'
   if (pathname.startsWith('/categories')) return 'category'
   if (pathname.startsWith('/review')) return 'review'
