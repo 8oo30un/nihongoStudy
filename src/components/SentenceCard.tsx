@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
+import { toRomaji } from 'wanakana'
 import { api } from '../lib/api'
 import { analyzeJapanese, toSentenceRomaji } from '../lib/analyze'
 import { speakJapanese } from '../lib/tts'
 import type { Sentence } from '../types'
+import { JapaneseTextarea } from './JapaneseTextarea'
+
+type WordDraft = {
+  id: string
+  surface: string
+  meaning: string
+  meaningTouched: boolean
+}
 
 export function SentenceCard({
   sentence,
@@ -20,10 +29,32 @@ export function SentenceCard({
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set())
   const [suggestions, setSuggestions] = useState<Record<string, string>>({})
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set())
+  const [drafts, setDrafts] = useState<WordDraft[]>([])
   const [notice, setNotice] = useState('')
 
   const romaji = useMemo(() => toSentenceRomaji(sentence.jpKana), [sentence.jpKana])
   const words = useMemo(() => analyzeJapanese(sentence.jpKana), [sentence.jpKana])
+
+  useEffect(() => {
+    setDrafts(
+      words.map((word) => ({
+        id: word.key,
+        surface: word.surface,
+        meaning: '',
+        meaningTouched: false,
+      })),
+    )
+  }, [words])
+
+  useEffect(() => {
+    setDrafts((prev) =>
+      prev.map((draft) =>
+        draft.meaningTouched || draft.meaning
+          ? draft
+          : { ...draft, meaning: suggestions[draft.id] ?? '' },
+      ),
+    )
+  }, [suggestions])
 
   useEffect(() => {
     if (!open) return
@@ -51,19 +82,40 @@ export function SentenceCard({
     }
   }, [open, words])
 
-  async function addWord(word: { key: string; surface: string; reading: string; romaji: string }) {
+  function updateDraft(index: number, patch: Partial<WordDraft>) {
+    setDrafts((prev) => prev.map((draft, i) => (i === index ? { ...draft, ...patch } : draft)))
+  }
+
+  function attachNext(index: number) {
+    setDrafts((prev) => {
+      const current = prev[index]
+      const next = prev[index + 1]
+      if (!current || !next) return prev
+      const merged: WordDraft = {
+        ...current,
+        surface: `${current.surface}${next.surface}`,
+        meaning: current.meaningTouched || current.meaning ? current.meaning : next.meaning,
+        meaningTouched: current.meaningTouched,
+      }
+      return [...prev.slice(0, index), merged, ...prev.slice(index + 2)]
+    })
+  }
+
+  async function addWord(draft: WordDraft) {
+    const surface = draft.surface.trim()
+    if (!surface) return
     setNotice('')
     try {
       const saved = await api.addVocab({
-        surface: word.surface,
-        reading: word.reading,
-        romaji: word.romaji,
-        koMeaning: suggestions[word.key] ?? '',
+        surface,
+        reading: surface,
+        romaji: toRomaji(surface),
+        koMeaning: draft.meaning.trim(),
         contextKo: sentence.koText,
         contextJp: sentence.jpKana,
         sourceSentenceId: sentence.id,
       })
-      setSavedKeys((prev) => new Set(prev).add(word.key))
+      setSavedKeys((prev) => new Set(prev).add(`${surface}|${surface}`))
       setNotice(saved.already ? '이미 단어장에 있습니다.' : '단어장에 넣었습니다.')
     } catch (err) {
       setNotice(err instanceof Error ? err.message : '단어장에 넣지 못했습니다.')
@@ -106,40 +158,54 @@ export function SentenceCard({
               <p className="text-[13px] leading-relaxed text-ink/90">{sentence.koText}</p>
               <p className="mt-2 font-ui text-[12px] tracking-[0.04em] text-ink/70">{romaji}</p>
               <p className="step-label mt-5">단어장에 넣기</p>
-              <p className="meta mt-1">한글 뜻은 자동으로 찾아 줍니다. 틀리면 단어장에서 고치면 됩니다.</p>
-              <ul className="mt-3 space-y-3">
-                {words.map((word) => {
-                  const saved = savedKeys.has(word.key)
-                  const suggested = suggestions[word.key]
-                  const loading = loadingKeys.has(word.key)
+              <p className="meta mt-1">뜻을 고치거나, 가나를 더 적은 뒤 넣으면 됩니다. 다음 어절은 붙이기로 이어 붙입니다.</p>
+              <ul className="mt-3 space-y-4">
+                {drafts.map((draft, index) => {
+                  const key = `${draft.surface.trim()}|${draft.surface.trim()}`
+                  const saved = savedKeys.has(key)
+                  const loading = loadingKeys.has(draft.id)
                   return (
-                    <li key={word.key} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                      <span className="font-jp text-[15px]">{word.surface}</span>
-                      <span className="font-ui text-[11px] tracking-[0.04em] text-ink/60">{word.romaji}</span>
-                      {loading ? (
-                        <span className="meta">뜻 찾는 중</span>
-                      ) : suggested ? (
-                        <span className="text-[13px] text-ink/85">{suggested}</span>
-                      ) : saved ? null : (
-                        <span className="meta">뜻을 못 찾음</span>
-                      )}
-                      {saved ? (
-                        <span className="meta">넣음</span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="quiet-link"
-                          disabled={loading}
-                          onClick={() => void addWord(word)}
-                        >
-                          add
-                        </button>
-                      )}
+                    <li key={`${draft.id}-${index}`}>
+                      <JapaneseTextarea
+                        compact
+                        value={draft.surface}
+                        onChange={(e) => updateDraft(index, { surface: e.target.value })}
+                        placeholder="したくする"
+                        className="!min-h-[2.2rem] !text-[1.05rem] !leading-7"
+                      />
+                      <div className="mt-2 flex flex-wrap items-end gap-3">
+                        <input
+                          className="ink-input min-w-[10rem] flex-1"
+                          value={draft.meaning}
+                          onChange={(e) =>
+                            updateDraft(index, { meaning: e.target.value, meaningTouched: true })
+                          }
+                          placeholder={loading ? '뜻 찾는 중' : '한글 뜻'}
+                        />
+                        {index < drafts.length - 1 && (
+                          <button type="button" className="quiet-link" onClick={() => attachNext(index)}>
+                            붙이기
+                          </button>
+                        )}
+                        {saved ? (
+                          <span className="meta">넣음</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="quiet-link"
+                            disabled={loading && !draft.meaningTouched}
+                            onClick={() => void addWord(draft)}
+                          >
+                            add
+                          </button>
+                        )}
+                      </div>
+                      <p className="meta mt-1">{toRomaji(draft.surface.trim())}</p>
                     </li>
                   )
                 })}
               </ul>
-              {words.length === 0 && (
+              {drafts.length === 0 && (
                 <p className="meta mt-3">나눌 단어가 없습니다. 가나에서 어절을 띄어 쓰면 더 잘 갈립니다.</p>
               )}
               {notice && <p className="meta mt-3">{notice}</p>}

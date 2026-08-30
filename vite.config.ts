@@ -3,7 +3,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
-import { sqliteApiPlugin } from './server/vite-plugin.ts'
+import { sqliteApiPlugin } from './server/vite-plugin.js'
 
 export default defineConfig({
   plugins: [
@@ -13,6 +13,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.svg'],
+      workbox: {
+        navigateFallbackDenylist: [/^\/api\//],
+      },
       manifest: {
         name: 'にほんごノート',
         short_name: 'にほんご',

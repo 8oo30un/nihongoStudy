@@ -1,7 +1,7 @@
 import { toHiragana } from 'wanakana'
-import { analyzeJapanese } from '../src/lib/analyze.ts'
-import { db } from './db.ts'
-import { toReadingKana } from './to-kana.ts'
+import { analyzeJapanese } from '../src/lib/analyze.js'
+import { db } from './db.js'
+import { toReadingKana } from './to-kana.js'
 
 const COMMON: Record<string, string> = {
   する: '하다',
@@ -74,25 +74,19 @@ export type MeaningSuggest = {
   source: 'cache' | 'common' | 'jisho' | 'mt' | ''
 }
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS meaning_cache (
-  query TEXT PRIMARY KEY,
-  ko_meaning TEXT NOT NULL,
-  source TEXT NOT NULL
-);
-`)
-
-function lookupCache(query: string) {
-  return db.prepare('SELECT ko_meaning, source FROM meaning_cache WHERE query = ?').get(query) as
+async function lookupCache(query: string) {
+  return (await db.prepare('SELECT ko_meaning, source FROM meaning_cache WHERE query = ?').get(query)) as
     | { ko_meaning: string; source: string }
     | undefined
 }
 
-function saveCache(query: string, koMeaning: string, source: string) {
-  db.prepare(
-    `INSERT INTO meaning_cache (query, ko_meaning, source) VALUES (?, ?, ?)
+async function saveCache(query: string, koMeaning: string, source: string) {
+  await db
+    .prepare(
+      `INSERT INTO meaning_cache (query, ko_meaning, source) VALUES (?, ?, ?)
      ON CONFLICT(query) DO UPDATE SET ko_meaning = excluded.ko_meaning, source = excluded.source`,
-  ).run(query, koMeaning, source)
+    )
+    .run(query, koMeaning, source)
 }
 
 function queryKeys(surface: string) {
@@ -224,7 +218,7 @@ export async function suggestMeaning(surface: string): Promise<MeaningSuggest> {
   const query = surface.trim()
   if (!query) return { query, primary: '', alternatives: [], source: '' }
 
-  const cached = lookupCache(query)
+  const cached = await lookupCache(query)
   if (cached?.ko_meaning) {
     return {
       query,
@@ -236,13 +230,13 @@ export async function suggestMeaning(surface: string): Promise<MeaningSuggest> {
 
   const fromCommon = commonMeaning(query)
   if (fromCommon) {
-    saveCache(query, fromCommon, 'common')
+    await saveCache(query, fromCommon, 'common')
     return { query, primary: fromCommon, alternatives: [fromCommon], source: 'common' }
   }
 
   const fromJisho = await lookupViaJisho(query)
   if (fromJisho) {
-    saveCache(query, fromJisho, 'jisho')
+    await saveCache(query, fromJisho, 'jisho')
     return { query, primary: fromJisho, alternatives: uniqueMeanings([fromJisho]), source: 'jisho' }
   }
 
@@ -297,10 +291,10 @@ export async function suggestJapanese(text: string): Promise<MeaningSuggest> {
   }
 
   const cacheId = japaneseKey(query)
-  const cached = lookupCache(cacheId)
+  const cached = await lookupCache(cacheId)
   if (cached?.ko_meaning) {
     const primary = await toReadingKana(cached.ko_meaning)
-    if (primary !== cached.ko_meaning) saveCache(cacheId, primary, cached.source)
+    if (primary !== cached.ko_meaning) await saveCache(cacheId, primary, cached.source)
     return {
       query,
       primary,
@@ -312,13 +306,13 @@ export async function suggestJapanese(text: string): Promise<MeaningSuggest> {
   const fromCommon = reverseCommon(query)
   if (fromCommon) {
     const primary = await toReadingKana(fromCommon)
-    saveCache(cacheId, primary, 'common')
+    await saveCache(cacheId, primary, 'common')
     return { query, primary, alternatives: [primary], source: 'common' }
   }
 
   const fromMt = await translateKoJa(query)
   if (fromMt) {
-    saveCache(cacheId, fromMt, 'mt')
+    await saveCache(cacheId, fromMt, 'mt')
     return { query, primary: fromMt, alternatives: [fromMt], source: 'mt' }
   }
 
@@ -332,7 +326,7 @@ export async function suggestSentence(text: string): Promise<MeaningSuggest> {
   }
 
   const cacheId = sentenceKey(query)
-  const cached = lookupCache(cacheId)
+  const cached = await lookupCache(cacheId)
   if (cached?.ko_meaning) {
     return {
       query,
@@ -350,19 +344,19 @@ export async function suggestSentence(text: string): Promise<MeaningSuggest> {
     .filter(Boolean)
   const joined: string[] = []
   for (const part of parts) {
-    if (part === '하다' && joined.at(-1)?.endsWith('하다')) continue
+    if (part === '하다' && joined[joined.length - 1]?.endsWith('하다')) continue
     joined.push(part)
   }
   const fromWords = joined.join(' ').trim()
   if (fromWords) {
-    saveCache(cacheId, fromWords, 'jisho')
+    await saveCache(cacheId, fromWords, 'jisho')
     return { query, primary: fromWords, alternatives: uniqueMeanings([fromWords]), source: 'jisho' }
   }
 
   const stripped = query.replace(/[。、！？!?.,]+/g, ' ').replace(/\s+/g, ' ').trim()
   const ko = (await translateJaKo(stripped)) || (await translateJaKo(query))
   if (ko) {
-    saveCache(cacheId, ko, 'mt')
+    await saveCache(cacheId, ko, 'mt')
     return { query, primary: ko, alternatives: uniqueMeanings([ko]), source: 'mt' }
   }
 

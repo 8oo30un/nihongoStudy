@@ -77,8 +77,16 @@ export const api = {
     contextJp?: string
     sourceSentenceId?: number | null
   }) => request<Vocab>('/api/vocab', { method: 'POST', body: JSON.stringify(body) }),
-  patchVocab: (id: number, body: { koMeaning?: string; selfMark?: 'ok' | 'wrong' }) =>
-    request<Vocab>(`/api/vocab/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  patchVocab: (
+    id: number,
+    body: {
+      koMeaning?: string
+      surface?: string
+      reading?: string
+      romaji?: string
+      selfMark?: 'ok' | 'wrong'
+    },
+  ) => request<Vocab>(`/api/vocab/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteVocab: (id: number) => request<{ ok: boolean }>(`/api/vocab/${id}`, { method: 'DELETE' }),
   suggest: (q: string, kind?: 'sentence' | 'japanese') =>
     request<MeaningSuggest>(

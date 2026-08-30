@@ -3,10 +3,6 @@ import { dirname, join } from 'node:path'
 import { toHiragana } from 'wanakana'
 import type { IpadicFeatures, Tokenizer } from 'kuromoji'
 
-const require = createRequire(import.meta.url)
-const kuromoji = require('kuromoji') as typeof import('kuromoji')
-const dictPath = join(dirname(require.resolve('kuromoji/package.json')), 'dict')
-
 const KANJI = /[\u4e00-\u9faf]/
 const ATTACH = new Set(['助詞', '助動詞', '記号'])
 
@@ -18,6 +14,9 @@ function hasKanji(text: string) {
 
 function getTokenizer() {
   tokenizerPromise ??= new Promise((resolve, reject) => {
+    const require = createRequire(import.meta.url)
+    const kuromoji = require('kuromoji') as typeof import('kuromoji')
+    const dictPath = join(dirname(require.resolve('kuromoji/package.json')), 'dict')
     kuromoji.builder({ dicPath: dictPath }).build((err, tokenizer) => {
       if (!tokenizer) {
         tokenizerPromise = null

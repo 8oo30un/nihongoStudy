@@ -11,6 +11,7 @@ export function VocabPage() {
   const [surface, setSurface] = useState('')
   const { ko: koMeaning, onKoChange, status: koStatus, reset: resetKo } = useAutoKorean(surface)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [editSurface, setEditSurface] = useState('')
   const [meaning, setMeaning] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -47,10 +48,28 @@ export function VocabPage() {
     }
   }
 
-  async function saveMeaning(item: Vocab) {
-    await api.patchVocab(item.id, { koMeaning: meaning })
-    setEditingId(null)
-    await reload()
+  function startEdit(item: Vocab) {
+    setEditingId(item.id)
+    setEditSurface(item.reading.trim() || item.surface)
+    setMeaning(item.koMeaning)
+    setError('')
+  }
+
+  async function saveEdit(item: Vocab) {
+    const surface = editSurface.trim()
+    if (!surface) return
+    try {
+      await api.patchVocab(item.id, {
+        surface,
+        reading: surface,
+        romaji: toRomaji(surface),
+        koMeaning: meaning,
+      })
+      setEditingId(null)
+      await reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '단어를 고치지 못했습니다.')
+    }
   }
 
   return (
@@ -119,30 +138,37 @@ export function VocabPage() {
             <p className="mt-1 font-ui text-[12px] tracking-[0.04em] text-ink/70">{item.romaji}</p>
             {item.missCount > 0 && <p className="meta mt-1">틀림 {item.missCount}</p>}
             {editingId === item.id ? (
-              <div className="mt-3 flex flex-wrap items-end gap-3">
+              <div className="mt-3 space-y-3">
+                <JapaneseTextarea
+                  compact
+                  value={editSurface}
+                  onChange={(e) => setEditSurface(e.target.value)}
+                  placeholder="したくする"
+                  className="!min-h-[2.2rem] !text-[1.05rem] !leading-7"
+                />
                 <input
-                  className="ink-input max-w-[18rem] flex-1"
+                  className="ink-input"
                   value={meaning}
                   onChange={(e) => setMeaning(e.target.value)}
                   placeholder="한글 뜻"
                 />
-                <button type="button" className="quiet-link" onClick={() => void saveMeaning(item)}>
-                  저장
-                </button>
-                <button type="button" className="quiet-link opacity-50" onClick={() => setEditingId(null)}>
-                  닫기
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button type="button" className="quiet-link" onClick={() => void saveEdit(item)}>
+                    저장
+                  </button>
+                  <button type="button" className="quiet-link opacity-50" onClick={() => setEditingId(null)}>
+                    닫기
+                  </button>
+                </div>
               </div>
             ) : (
               <button
                 type="button"
                 className="mt-3 block text-left text-[13px] leading-relaxed text-ink/85"
-                onClick={() => {
-                  setEditingId(item.id)
-                  setMeaning(item.koMeaning)
-                }}
+                onClick={() => startEdit(item)}
               >
                 {item.koMeaning || <span className="meta">뜻을 적어 두기</span>}
+                <span className="meta mt-1 block">가나·뜻을 고치기</span>
               </button>
             )}
             {item.contextJp && (

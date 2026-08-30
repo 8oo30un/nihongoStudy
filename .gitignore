@@ -4,4 +4,7 @@ data/*.db
 data/*.db-*
 .DS_Store
 *.local
+.env
+.vercel
 .vite
+.env*.local

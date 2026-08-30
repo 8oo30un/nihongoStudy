@@ -1,5 +1,5 @@
-import { db, type SentenceRow, type VocabRow } from './db.ts'
-import { todaySeoul } from './util.ts'
+import { db, type SentenceRow, type VocabRow } from './db.js'
+import { todaySeoul } from './util.js'
 
 export type QuizKind = 'sentence' | 'vocab'
 export type QuizDirection = 'jp-ko' | 'ko-jp'
@@ -62,11 +62,11 @@ function buildQuestion(
   }
 }
 
-export function buildQuiz(limit = 10): QuizQuestion[] {
-  const sentences = db.prepare('SELECT * FROM sentence').all() as SentenceRow[]
-  const vocab = (
-    db.prepare('SELECT * FROM vocab').all() as VocabRow[]
-  ).filter((row) => row.ko_meaning.trim() && (row.reading.trim() || row.surface.trim()))
+export async function buildQuiz(limit = 10): Promise<QuizQuestion[]> {
+  const sentences = (await db.prepare('SELECT * FROM sentence').all()) as unknown as SentenceRow[]
+  const vocab = ((await db.prepare('SELECT * FROM vocab').all()) as unknown as VocabRow[]).filter(
+    (row) => row.ko_meaning.trim() && (row.reading.trim() || row.surface.trim()),
+  )
 
   const koPool = [
     ...sentences.map((row) => row.ko_text),
@@ -95,9 +95,11 @@ export function buildQuiz(limit = 10): QuizQuestion[] {
   return shuffle(candidates).slice(0, Math.max(1, limit))
 }
 
-function expectedAnswer(kind: QuizKind, itemId: number, direction: QuizDirection) {
+async function expectedAnswer(kind: QuizKind, itemId: number, direction: QuizDirection) {
   if (kind === 'sentence') {
-    const row = db.prepare('SELECT * FROM sentence WHERE id = ?').get(itemId) as SentenceRow | undefined
+    const row = (await db.prepare('SELECT * FROM sentence WHERE id = ?').get(itemId)) as unknown as
+      | SentenceRow
+      | undefined
     if (!row) return null
     return {
       answer: direction === 'jp-ko' ? row.ko_text.trim() : row.jp_kana.trim(),
@@ -105,9 +107,9 @@ function expectedAnswer(kind: QuizKind, itemId: number, direction: QuizDirection
       vocab: null,
     }
   }
-  const row = db.prepare('SELECT * FROM vocab WHERE id = ?').get(itemId) as VocabRow | undefined
+  const row = (await db.prepare('SELECT * FROM vocab WHERE id = ?').get(itemId)) as unknown as VocabRow | undefined
   if (!row) return null
-  const jp = (row.reading.trim() || row.surface.trim())
+  const jp = row.reading.trim() || row.surface.trim()
   return {
     answer: direction === 'jp-ko' ? row.ko_meaning.trim() : jp,
     row: null,
@@ -115,14 +117,14 @@ function expectedAnswer(kind: QuizKind, itemId: number, direction: QuizDirection
   }
 }
 
-export function gradeQuizAnswer(body: {
+export async function gradeQuizAnswer(body: {
   kind: QuizKind
   itemId: number
   direction: QuizDirection
   choice: string
   timezone: string
 }) {
-  const found = expectedAnswer(body.kind, body.itemId, body.direction)
+  const found = await expectedAnswer(body.kind, body.itemId, body.direction)
   if (!found) return null
   const correct = found.answer === body.choice.trim()
   const today = todaySeoul(body.timezone)
@@ -131,17 +133,21 @@ export function gradeQuizAnswer(body: {
   if (!correct) {
     missCount += 1
     if (found.row) {
-      db.prepare(
-        `UPDATE sentence
+      await db
+        .prepare(
+          `UPDATE sentence
          SET miss_count = ?, due_on = ?, last_reviewed_on = ?, self_mark = 'wrong'
          WHERE id = ?`,
-      ).run(missCount, today, today, body.itemId)
+        )
+        .run(missCount, today, today, body.itemId)
     } else {
-      db.prepare(
-        `UPDATE vocab
+      await db
+        .prepare(
+          `UPDATE vocab
          SET miss_count = ?, due_on = ?, last_reviewed_on = ?
          WHERE id = ?`,
-      ).run(missCount, today, today, body.itemId)
+        )
+        .run(missCount, today, today, body.itemId)
     }
   }
 
