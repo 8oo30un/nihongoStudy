@@ -152,6 +152,9 @@ export function TodayPage() {
           <SentenceCard
             key={sentence.id}
             sentence={sentence}
+            onUpdated={(next) => {
+              setSentences((prev) => prev.map((item) => (item.id === next.id ? next : item)))
+            }}
             onDelete={() => {
               void api.deleteSentence(sentence.id).then(() => reload())
             }}

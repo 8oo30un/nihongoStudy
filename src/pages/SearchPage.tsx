@@ -46,7 +46,13 @@ export function SearchPage() {
       )}
       <div className="mt-2">
         {results.map((sentence) => (
-          <SentenceCard key={sentence.id} sentence={sentence} />
+          <SentenceCard
+            key={sentence.id}
+            sentence={sentence}
+            onUpdated={(next) => {
+              setResults((prev) => prev.map((item) => (item.id === next.id ? next : item)))
+            }}
+          />
         ))}
       </div>
     </div>

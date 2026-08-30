@@ -18,19 +18,62 @@ export function SentenceCard({
   showKo = true,
   onMark,
   onDelete,
+  onUpdated,
 }: {
   sentence: Sentence
   showKo?: boolean
   onMark?: (mark: Sentence['selfMark']) => void
   onDelete?: () => void
+  onUpdated?: (next: Sentence) => void
 }) {
   const kanji = sentence.jpKanji?.trim()
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editJp, setEditJp] = useState(sentence.jpKana)
+  const [editKo, setEditKo] = useState(sentence.koText)
+  const [editKanji, setEditKanji] = useState(sentence.jpKanji ?? '')
+  const [showKanji, setShowKanji] = useState(Boolean(sentence.jpKanji?.trim()))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set())
   const [suggestions, setSuggestions] = useState<Record<string, string>>({})
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set())
   const [drafts, setDrafts] = useState<WordDraft[]>([])
   const [notice, setNotice] = useState('')
+
+  function startEdit() {
+    setEditJp(sentence.jpKana)
+    setEditKo(sentence.koText)
+    setEditKanji(sentence.jpKanji ?? '')
+    setShowKanji(Boolean(sentence.jpKanji?.trim()))
+    setError('')
+    setEditing(true)
+    setOpen(false)
+  }
+
+  async function saveEdit() {
+    const jpKana = editJp.trim()
+    const koText = editKo.trim()
+    if (!jpKana || !koText) {
+      setError('가나와 한글 뜻이 필요합니다.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const next = await api.patchSentence(sentence.id, {
+        jpKana,
+        koText,
+        jpKanji: showKanji ? editKanji.trim() || null : sentence.jpKanji,
+      })
+      setEditing(false)
+      onUpdated?.(next)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '문장을 고치지 못했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const romaji = useMemo(() => toSentenceRomaji(sentence.jpKana), [sentence.jpKana])
   const words = useMemo(() => analyzeJapanese(sentence.jpKana), [sentence.jpKana])
@@ -144,11 +187,49 @@ export function SentenceCard({
           listen
         </button>
       </div>
-      <p className="font-jp text-[1.35rem] leading-relaxed tracking-wide">{sentence.jpKana}</p>
-      {kanji && kanji !== sentence.jpKana && (
-        <p className="mt-1 font-jp text-[12px] tracking-wide text-ink/60">{kanji}</p>
+      {editing ? (
+        <div className="space-y-4">
+          <JapaneseTextarea
+            value={editJp}
+            onChange={(e) => setEditJp(e.target.value)}
+            placeholder="きょうは はれです。"
+          />
+          <input
+            className="ink-input"
+            value={editKo}
+            onChange={(e) => setEditKo(e.target.value)}
+            placeholder="오늘은 맑아요."
+          />
+          <button type="button" className="quiet-link" onClick={() => setShowKanji((v) => !v)}>
+            {showKanji ? '한자 칸 닫기' : '한자도 적어 두기'}
+          </button>
+          {showKanji && (
+            <input
+              className="ink-input font-jp"
+              value={editKanji}
+              onChange={(e) => setEditKanji(e.target.value)}
+              placeholder="今日は晴れです。"
+            />
+          )}
+          {error && <p className="meta">{error}</p>}
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" className="quiet-link" disabled={saving} onClick={() => void saveEdit()}>
+              {saving ? '저장 중' : '저장'}
+            </button>
+            <button type="button" className="quiet-link opacity-50" onClick={() => setEditing(false)}>
+              닫기
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="font-jp text-[1.35rem] leading-relaxed tracking-wide">{sentence.jpKana}</p>
+          {kanji && kanji !== sentence.jpKana && (
+            <p className="mt-1 font-jp text-[12px] tracking-wide text-ink/60">{kanji}</p>
+          )}
+        </>
       )}
-      {showKo && (
+      {showKo && !editing && (
         <div className="mt-3">
           <button type="button" className="quiet-link" onClick={() => setOpen((v) => !v)}>
             {open ? '▾ 한국어 뜻 · 로마자' : '▸ 한국어 뜻 · 로마자'}
@@ -213,25 +294,28 @@ export function SentenceCard({
           )}
         </div>
       )}
-      {(onMark || onDelete) && (
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          {onMark && (
-            <>
-              <button type="button" className="quiet-link" onClick={() => onMark('ok')}>
-                ok
-              </button>
-              <button type="button" className="quiet-link" onClick={() => onMark('wrong')}>
-                again
-              </button>
-            </>
-          )}
-          {onDelete && (
-            <button type="button" className="quiet-link ml-auto opacity-50" onClick={onDelete}>
-              delete
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        {onMark && (
+          <>
+            <button type="button" className="quiet-link" onClick={() => onMark('ok')}>
+              ok
             </button>
-          )}
-        </div>
-      )}
+            <button type="button" className="quiet-link" onClick={() => onMark('wrong')}>
+              again
+            </button>
+          </>
+        )}
+        {!editing && (
+          <button type="button" className="quiet-link" onClick={startEdit}>
+            고치기
+          </button>
+        )}
+        {onDelete && (
+          <button type="button" className="quiet-link ml-auto opacity-50" onClick={onDelete}>
+            delete
+          </button>
+        )}
+      </div>
     </article>
   )
 }

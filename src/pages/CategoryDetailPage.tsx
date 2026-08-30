@@ -37,7 +37,13 @@ export function CategoryDetailPage() {
       />
       <div className="mt-2">
         {filtered.map((sentence) => (
-          <SentenceCard key={sentence.id} sentence={sentence} />
+          <SentenceCard
+            key={sentence.id}
+            sentence={sentence}
+            onUpdated={(next) => {
+              setSentences((prev) => prev.map((item) => (item.id === next.id ? next : item)))
+            }}
+          />
         ))}
         {filtered.length === 0 && <p className="meta py-8">이 칸에 문장이 없습니다.</p>}
       </div>
