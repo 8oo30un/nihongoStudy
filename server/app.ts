@@ -303,8 +303,8 @@ export function createApp() {
   })
 
   app.get('/api/quiz', async (c) => {
-    const limit = Number(c.req.query('count') ?? 10)
-    const questions = await buildQuiz(Number.isFinite(limit) ? limit : 10)
+    const limit = Number(c.req.query('count') ?? 15)
+    const questions = await buildQuiz(Number.isFinite(limit) ? limit : 15)
     return c.json({ questions })
   })
 

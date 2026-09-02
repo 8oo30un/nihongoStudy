@@ -92,7 +92,7 @@ export const api = {
     request<MeaningSuggest>(
       `/api/suggest?q=${encodeURIComponent(q)}${kind ? `&kind=${kind}` : ''}`,
     ),
-  quiz: (count = 10) => request<{ questions: QuizQuestion[] }>(`/api/quiz?count=${count}`),
+  quiz: (count = 15) => request<{ questions: QuizQuestion[] }>(`/api/quiz?count=${count}`),
   gradeQuiz: (body: {
     kind: QuizQuestion['kind']
     itemId: number

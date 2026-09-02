@@ -62,7 +62,9 @@ function buildQuestion(
   }
 }
 
-export async function buildQuiz(limit = 10): Promise<QuizQuestion[]> {
+export async function buildQuiz(limit = 15): Promise<QuizQuestion[]> {
+  const want = Math.max(1, limit)
+  const today = todaySeoul()
   const sentences = (await db.prepare('SELECT * FROM sentence').all()) as unknown as SentenceRow[]
   const vocab = ((await db.prepare('SELECT * FROM vocab').all()) as unknown as VocabRow[]).filter(
     (row) => row.ko_meaning.trim() && (row.reading.trim() || row.surface.trim()),
@@ -77,22 +79,83 @@ export async function buildQuiz(limit = 10): Promise<QuizQuestion[]> {
     ...vocab.map((row) => row.reading || row.surface),
   ]
 
-  const candidates: QuizQuestion[] = []
-  for (const row of sentences) {
+  function questionsForSentence(row: SentenceRow): QuizQuestion[] {
+    const out: QuizQuestion[] = []
     const jpKo = buildQuestion('sentence', row.id, 'jp-ko', row.jp_kana, row.ko_text, koPool)
     const koJp = buildQuestion('sentence', row.id, 'ko-jp', row.ko_text, row.jp_kana, jpPool)
-    if (jpKo) candidates.push(jpKo)
-    if (koJp) candidates.push(koJp)
+    if (jpKo) out.push(jpKo)
+    if (koJp) out.push(koJp)
+    return out
   }
-  for (const row of vocab) {
+
+  function questionsForVocab(row: VocabRow): QuizQuestion[] {
+    const out: QuizQuestion[] = []
     const jp = row.reading.trim() || row.surface.trim()
     const jpKo = buildQuestion('vocab', row.id, 'jp-ko', jp, row.ko_meaning, koPool)
     const koJp = buildQuestion('vocab', row.id, 'ko-jp', row.ko_meaning, jp, jpPool)
-    if (jpKo) candidates.push(jpKo)
-    if (koJp) candidates.push(koJp)
+    if (jpKo) out.push(jpKo)
+    if (koJp) out.push(koJp)
+    return out
   }
 
-  return shuffle(candidates).slice(0, Math.max(1, limit))
+  const todaySentences = shuffle(sentences.filter((row) => row.created_on === today))
+  const todayVocab = shuffle(vocab.filter((row) => row.created_on === today))
+
+  // 오늘 저장한 문장은 최대 5개를 반드시 포함 (문장당 문제 1개)
+  const mustHave: QuizQuestion[] = []
+  const usedKeys = new Set<string>()
+  for (const row of todaySentences.slice(0, 5)) {
+    const pick = shuffle(questionsForSentence(row))[0]
+    if (!pick) continue
+    mustHave.push(pick)
+    usedKeys.add(`${pick.kind}:${pick.itemId}`)
+  }
+
+  // 오늘 문장·단어가 전혀 없으면 기존 전체에서 15개
+  if (mustHave.length === 0 && todayVocab.length === 0) {
+    const all: QuizQuestion[] = []
+    for (const row of sentences) all.push(...questionsForSentence(row))
+    for (const row of vocab) all.push(...questionsForVocab(row))
+    return shuffle(all).slice(0, want)
+  }
+
+  const picked: QuizQuestion[] = [...mustHave]
+
+  // 남은 칸: 오늘 단어 우선 → 그다음 기존 문장/단어
+  const todayVocabPicks: QuizQuestion[] = []
+  for (const row of todayVocab) {
+    if (usedKeys.has(`vocab:${row.id}`)) continue
+    const pick = shuffle(questionsForVocab(row))[0]
+    if (!pick) continue
+    todayVocabPicks.push(pick)
+    usedKeys.add(`vocab:${row.id}`)
+  }
+
+  for (const q of todayVocabPicks) {
+    if (picked.length >= want) break
+    picked.push(q)
+  }
+
+  if (picked.length < want) {
+    const filler: QuizQuestion[] = []
+    for (const row of sentences) {
+      if (usedKeys.has(`sentence:${row.id}`)) continue
+      filler.push(...questionsForSentence(row))
+    }
+    for (const row of vocab) {
+      if (usedKeys.has(`vocab:${row.id}`)) continue
+      filler.push(...questionsForVocab(row))
+    }
+    for (const q of shuffle(filler)) {
+      if (picked.length >= want) break
+      const key = `${q.kind}:${q.itemId}`
+      if (usedKeys.has(key)) continue
+      usedKeys.add(key)
+      picked.push(q)
+    }
+  }
+
+  return shuffle(picked).slice(0, want)
 }
 
 async function expectedAnswer(kind: QuizKind, itemId: number, direction: QuizDirection) {
