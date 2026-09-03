@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { speakJapanese } from '../lib/tts'
 import type { QuizGrade, QuizQuestion } from '../types'
@@ -11,7 +11,18 @@ type Missed = {
   missCount: number
 }
 
+type QuizScope = 'all' | 'today-sentences'
+
+function clampCount(value: number) {
+  if (!Number.isFinite(value)) return 15
+  return Math.min(30, Math.max(1, Math.round(value)))
+}
+
 export function TestPage() {
+  const [searchParams] = useSearchParams()
+  const preferToday = searchParams.get('scope') === 'today'
+  const [questionCount, setQuestionCount] = useState(15)
+  const [scope, setScope] = useState<QuizScope>(preferToday ? 'today-sentences' : 'all')
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [index, setIndex] = useState(0)
   const [picked, setPicked] = useState('')
@@ -23,14 +34,21 @@ export function TestPage() {
   const current = questions[index]
   const done = questions.length > 0 && index >= questions.length
 
-  async function start() {
+  async function start(nextScope: QuizScope = scope) {
+    const count = clampCount(questionCount)
+    setQuestionCount(count)
+    setScope(nextScope)
     setError('')
     setLoading(true)
     try {
-      const { questions: next } = await api.quiz(15)
+      const { questions: next } = await api.quiz(count, nextScope)
       if (!next.length) {
         setQuestions([])
-        setError('문장이나 단어를 적어도 두 개 이상 적어 주세요. 보기를 만들 재료가 없습니다.')
+        setError(
+          nextScope === 'today-sentences'
+            ? '오늘 저장한 문장이 없거나, 보기를 만들 다른 문장이 없습니다.'
+            : '문장이나 단어를 적어도 두 개 이상 적어 주세요. 보기를 만들 재료가 없습니다.',
+        )
         return
       }
       setQuestions(next)
@@ -98,7 +116,7 @@ export function TestPage() {
           </div>
         )}
         <div className="mt-10 flex flex-wrap gap-4">
-          <button type="button" className="ink-btn" onClick={() => void start()}>
+          <button type="button" className="ink-btn" onClick={() => void start(scope)}>
             다시 보기
           </button>
           {missed.length > 0 && (
@@ -115,14 +133,43 @@ export function TestPage() {
     return (
       <div>
         <p className="section-title kicker">test</p>
-        <p className="meta mt-4">적어 둔 문장과 단어로 객관식 15문제를 냅니다. 오늘 저장한 문장은 반드시 포함됩니다.</p>
+        <p className="meta mt-4">
+          적어 둔 문장과 단어로 객관식 {clampCount(questionCount)}문제를 냅니다. 시작하기는 오늘 문장을 섞고, 오늘
+          학습 문장 공부하기는 오늘 저장한 문장만 냅니다.
+        </p>
         <p className="mt-8 font-kr text-[15px] leading-relaxed text-ink/85">
           일본어를 보고 한글을 고르거나, 한글을 보고 일본어를 고릅니다. 틀리면 복습으로 들어가고 틀린 횟수가 남습니다.
         </p>
+        <label className="mt-10 block">
+          <span className="label">문제 수</span>
+          <input
+            type="number"
+            min={1}
+            max={30}
+            className="ink-input"
+            value={questionCount}
+            onChange={(e) => setQuestionCount(Number(e.target.value))}
+          />
+        </label>
         {error && <p className="meta mt-6">{error}</p>}
-        <button type="button" className="ink-btn mt-10" disabled={loading} onClick={() => void start()}>
-          {loading ? '만드는 중' : '시작하기'}
-        </button>
+        <div className="mt-10 flex flex-col items-start gap-4">
+          <button
+            type="button"
+            className="ink-btn"
+            disabled={loading}
+            onClick={() => void start('all')}
+          >
+            {loading && scope === 'all' ? '만드는 중' : '시작하기'}
+          </button>
+          <button
+            type="button"
+            className="ink-btn-warn"
+            disabled={loading}
+            onClick={() => void start('today-sentences')}
+          >
+            {loading && scope === 'today-sentences' ? '만드는 중' : '오늘 학습 문장 공부하기'}
+          </button>
+        </div>
       </div>
     )
   }
@@ -134,6 +181,12 @@ export function TestPage() {
         {index + 1}/{questions.length}
         <span className="mx-2 opacity-50">/</span>
         {current.kind === 'vocab' ? '단어' : '문장'}
+        {scope === 'today-sentences' && (
+          <>
+            <span className="mx-2 opacity-50">/</span>
+            오늘 문장
+          </>
+        )}
       </p>
       <p
         className={`mt-10 leading-relaxed ${

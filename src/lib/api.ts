@@ -61,10 +61,14 @@ export const api = {
   diaryDates: (month: string) => request<string[]>(`/api/diaries?month=${encodeURIComponent(month)}`),
   saveDiary: (date: string, body: { jpKana: string; jpKanji?: string | null; koNote: string }) =>
     request<DiaryEntry>(`/api/diary/${date}`, { method: 'PUT', body: JSON.stringify(body) }),
-  vocab: (q?: string, due?: string) => {
+  vocab: (query: string | { q?: string; due?: string; date?: string } = {}) => {
+    const q = typeof query === 'string' ? query : query.q
+    const due = typeof query === 'string' ? undefined : query.due
+    const date = typeof query === 'string' ? undefined : query.date
     const params = new URLSearchParams()
     if (q?.trim()) params.set('q', q.trim())
     if (due) params.set('due', due)
+    if (date) params.set('date', date)
     const qs = params.toString()
     return request<Vocab[]>(`/api/vocab${qs ? `?${qs}` : ''}`)
   },
@@ -92,7 +96,11 @@ export const api = {
     request<MeaningSuggest>(
       `/api/suggest?q=${encodeURIComponent(q)}${kind ? `&kind=${kind}` : ''}`,
     ),
-  quiz: (count = 15) => request<{ questions: QuizQuestion[] }>(`/api/quiz?count=${count}`),
+  quiz: (count = 15, scope?: 'all' | 'today-sentences') => {
+    const params = new URLSearchParams({ count: String(count) })
+    if (scope === 'today-sentences') params.set('scope', scope)
+    return request<{ questions: QuizQuestion[] }>(`/api/quiz?${params}`)
+  },
   gradeQuiz: (body: {
     kind: QuizQuestion['kind']
     itemId: number

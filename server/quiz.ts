@@ -62,9 +62,14 @@ function buildQuestion(
   }
 }
 
-export async function buildQuiz(limit = 15): Promise<QuizQuestion[]> {
-  const want = Math.max(1, limit)
-  const today = todaySeoul()
+export type QuizScope = 'all' | 'today-sentences'
+
+export async function buildQuiz(
+  limit = 15,
+  options: { scope?: QuizScope; timezone?: string } = {},
+): Promise<QuizQuestion[]> {
+  const want = Math.max(1, Math.min(30, limit))
+  const today = todaySeoul(options.timezone)
   const sentences = (await db.prepare('SELECT * FROM sentence').all()) as unknown as SentenceRow[]
   const vocab = ((await db.prepare('SELECT * FROM vocab').all()) as unknown as VocabRow[]).filter(
     (row) => row.ko_meaning.trim() && (row.reading.trim() || row.surface.trim()),
@@ -100,6 +105,31 @@ export async function buildQuiz(limit = 15): Promise<QuizQuestion[]> {
 
   const todaySentences = shuffle(sentences.filter((row) => row.created_on === today))
   const todayVocab = shuffle(vocab.filter((row) => row.created_on === today))
+
+  if (options.scope === 'today-sentences') {
+    const picked: QuizQuestion[] = []
+    const usedKeys = new Set<string>()
+    for (const row of todaySentences) {
+      if (picked.length >= want) break
+      const pick = shuffle(questionsForSentence(row))[0]
+      if (!pick) continue
+      picked.push(pick)
+      usedKeys.add(`${pick.kind}:${pick.itemId}:${pick.direction}`)
+    }
+    if (picked.length < want) {
+      for (const row of todaySentences) {
+        if (picked.length >= want) break
+        for (const q of questionsForSentence(row)) {
+          const key = `${q.kind}:${q.itemId}:${q.direction}`
+          if (usedKeys.has(key)) continue
+          usedKeys.add(key)
+          picked.push(q)
+          break
+        }
+      }
+    }
+    return shuffle(picked).slice(0, want)
+  }
 
   // 오늘 저장한 문장은 최대 5개를 반드시 포함 (문장당 문제 1개)
   const mustHave: QuizQuestion[] = []

@@ -304,7 +304,11 @@ export function createApp() {
 
   app.get('/api/quiz', async (c) => {
     const limit = Number(c.req.query('count') ?? 15)
-    const questions = await buildQuiz(Number.isFinite(limit) ? limit : 15)
+    const scope = c.req.query('scope') === 'today-sentences' ? 'today-sentences' : 'all'
+    const questions = await buildQuiz(Number.isFinite(limit) ? limit : 15, {
+      scope,
+      timezone: (await getSettings()).timezone,
+    })
     return c.json({ questions })
   })
 
@@ -332,6 +336,7 @@ export function createApp() {
   app.get('/api/vocab', async (c) => {
     const q = c.req.query('q')?.trim() ?? ''
     const due = c.req.query('due')?.trim() ?? ''
+    const date = c.req.query('date')?.trim() ?? ''
     let sql = 'SELECT * FROM vocab'
     const params: string[] = []
     const where: string[] = []
@@ -345,6 +350,10 @@ export function createApp() {
     if (due) {
       where.push('due_on IS NOT NULL AND due_on <= ?')
       params.push(due)
+    }
+    if (date) {
+      where.push('created_on = ?')
+      params.push(date)
     }
     if (where.length) sql += ` WHERE ${where.join(' AND ')}`
     sql += ' ORDER BY id DESC'

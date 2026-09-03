@@ -19,7 +19,7 @@ export function ReviewPage() {
     setStats(s)
     const [sentences, vocab] = await Promise.all([
       api.sentences({ due: s.today }),
-      api.vocab(undefined, s.today),
+      api.vocab({ due: s.today }),
     ])
     setQueue([
       ...sentences.map((sentence) => ({ kind: 'sentence' as const, id: sentence.id, sentence })),

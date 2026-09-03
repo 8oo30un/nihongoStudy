@@ -147,7 +147,14 @@ export function TodayPage() {
       </form>
 
       <div className="mt-4 border-t border-white/20 pt-8">
-        <p className="step-label">오늘 적은 문장</p>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <p className="step-label">오늘 적은 문장</p>
+          {sentences.length > 0 && (
+            <Link to="/test?scope=today" className="quiet-link">
+              오늘 학습 문장 공부하기
+            </Link>
+          )}
+        </div>
         {sentences.map((sentence) => (
           <SentenceCard
             key={sentence.id}

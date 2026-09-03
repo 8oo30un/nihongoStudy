@@ -3,7 +3,7 @@ import { JapaneseTextarea } from '../components/JapaneseTextarea'
 import { api } from '../lib/api'
 import { useLinkedTranslation } from '../lib/use-linked-translation'
 import { speakJapanese } from '../lib/tts'
-import type { DiaryEntry, TodayStats } from '../types'
+import type { DiaryEntry, Sentence, TodayStats, Vocab } from '../types'
 
 const WEEKDAYS = ['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa']
 const MONTHS = [
@@ -59,6 +59,28 @@ function monthCells(year: number, month: number) {
   return cells
 }
 
+function shuffle<T>(items: T[]) {
+  const next = [...items]
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const left = next[i]
+    const right = next[j]
+    if (left === undefined || right === undefined) continue
+    next[i] = right
+    next[j] = left
+  }
+  return next
+}
+
+function joinLine(current: string, next: string) {
+  const left = current.trim()
+  const right = next.trim()
+  if (!right) return current
+  if (!left) return right
+  if (left.includes(right)) return current
+  return `${left}\n${right}`
+}
+
 export function DiaryPage() {
   const [stats, setStats] = useState<TodayStats | null>(null)
   const [entry, setEntry] = useState<DiaryEntry | null>(null)
@@ -70,6 +92,10 @@ export function DiaryPage() {
   const [written, setWritten] = useState<Set<string>>(new Set())
   const { jp: jpKana, ko: koNote, onJpChange, onKoChange, setPair, status } = useLinkedTranslation()
   const [saved, setSaved] = useState(false)
+  const [daySentences, setDaySentences] = useState<Sentence[]>([])
+  const [dayVocab, setDayVocab] = useState<Vocab[]>([])
+  const [extraSentences, setExtraSentences] = useState<Sentence[]>([])
+  const [extraVocab, setExtraVocab] = useState<Vocab[]>([])
 
   const monthKey = `${cursor.year}-${pad(cursor.month + 1)}`
   const cells = useMemo(() => monthCells(cursor.year, cursor.month), [cursor.year, cursor.month])
@@ -86,6 +112,36 @@ export function DiaryPage() {
     setSaved(false)
   }
 
+  async function loadHints(date: string) {
+    const [sameDaySentences, allSentences, sameDayVocab, allVocab] = await Promise.all([
+      api.sentences({ date }),
+      api.sentences(),
+      api.vocab({ date }),
+      api.vocab(),
+    ])
+    setDaySentences(sameDaySentences)
+    setDayVocab(sameDayVocab)
+    setExtraSentences(
+      shuffle(allSentences.filter((item) => item.createdOn !== date)).slice(0, 3),
+    )
+    setExtraVocab(shuffle(allVocab.filter((item) => item.createdOn !== date)).slice(0, 4))
+  }
+
+  function insertSentence(sentence: Sentence) {
+    setPair({
+      jp: joinLine(jpKana, sentence.jpKana),
+      ko: joinLine(koNote, sentence.koText),
+    })
+  }
+
+  function insertVocab(item: Vocab) {
+    const jp = item.reading.trim() || item.surface
+    setPair({
+      jp: joinLine(jpKana, jp),
+      ko: joinLine(koNote, item.koMeaning),
+    })
+  }
+
   useEffect(() => {
     void (async () => {
       const s = await api.stats()
@@ -93,7 +149,7 @@ export function DiaryPage() {
       const { year, month } = parseYmd(s.today)
       setCursor({ year, month })
       setSelected(s.today)
-      await loadDay(s.today)
+      await Promise.all([loadDay(s.today), loadHints(s.today)])
     })()
   }, [])
 
@@ -105,7 +161,7 @@ export function DiaryPage() {
     const { year, month } = parseYmd(date)
     setCursor({ year, month })
     setSelected(date)
-    await loadDay(date)
+    await Promise.all([loadDay(date), loadHints(date)])
   }
 
   async function save() {
@@ -181,7 +237,78 @@ export function DiaryPage() {
       </div>
 
       <p className="meta mt-8">{selected}</p>
-      <section className="mt-6 space-y-6">
+      <section className="mt-6">
+        <p className="step-label">추천</p>
+        <p className="meta mt-1">
+          저장해 둔 문장과 단어입니다. 누르면 아래 일기 칸에 넣습니다.
+        </p>
+        {daySentences.length === 0 &&
+          dayVocab.length === 0 &&
+          extraSentences.length === 0 &&
+          extraVocab.length === 0 && (
+            <p className="meta mt-4">아직 저장한 문장이나 단어가 없습니다.</p>
+          )}
+        {daySentences.length > 0 && (
+          <div className="mt-4">
+            <p className="label">그날 문장</p>
+            {daySentences.map((sentence) => (
+              <button
+                key={`day-s-${sentence.id}`}
+                type="button"
+                className="paper-card block w-full text-left"
+                onClick={() => insertSentence(sentence)}
+              >
+                <p className="font-jp text-[1.05rem] leading-relaxed tracking-wide">{sentence.jpKana}</p>
+                <p className="meta mt-1">{sentence.koText}</p>
+              </button>
+            ))}
+          </div>
+        )}
+        {dayVocab.length > 0 && (
+          <div className="mt-4">
+            <p className="label">그날 단어</p>
+            {dayVocab.map((item) => (
+              <button
+                key={`day-v-${item.id}`}
+                type="button"
+                className="paper-card block w-full text-left"
+                onClick={() => insertVocab(item)}
+              >
+                <p className="font-jp text-[1.05rem] tracking-wide">{item.reading.trim() || item.surface}</p>
+                <p className="meta mt-1">{item.koMeaning || item.romaji}</p>
+              </button>
+            ))}
+          </div>
+        )}
+        {(extraSentences.length > 0 || extraVocab.length > 0) && (
+          <div className="mt-4">
+            <p className="label">{daySentences.length || dayVocab.length ? '다른 날에서' : '저장해 둔 것에서'}</p>
+            {extraSentences.map((sentence) => (
+              <button
+                key={`extra-s-${sentence.id}`}
+                type="button"
+                className="paper-card block w-full text-left"
+                onClick={() => insertSentence(sentence)}
+              >
+                <p className="font-jp text-[1.05rem] leading-relaxed tracking-wide">{sentence.jpKana}</p>
+                <p className="meta mt-1">{sentence.koText}</p>
+              </button>
+            ))}
+            {extraVocab.map((item) => (
+              <button
+                key={`extra-v-${item.id}`}
+                type="button"
+                className="paper-card block w-full text-left"
+                onClick={() => insertVocab(item)}
+              >
+                <p className="font-jp text-[1.05rem] tracking-wide">{item.reading.trim() || item.surface}</p>
+                <p className="meta mt-1">{item.koMeaning || item.romaji}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+      <section className="mt-10 space-y-6">
         <label className="block">
           <span className="label">일본어</span>
           <JapaneseTextarea
