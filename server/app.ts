@@ -304,7 +304,9 @@ export function createApp() {
 
   app.get('/api/quiz', async (c) => {
     const limit = Number(c.req.query('count') ?? 15)
-    const scope = c.req.query('scope') === 'today-sentences' ? 'today-sentences' : 'all'
+    const scopeQuery = c.req.query('scope')
+    const scope =
+      scopeQuery === 'today-sentences' || scopeQuery === 'week' ? scopeQuery : 'all'
     const questions = await buildQuiz(Number.isFinite(limit) ? limit : 15, {
       scope,
       timezone: (await getSettings()).timezone,

@@ -11,7 +11,7 @@ type Missed = {
   missCount: number
 }
 
-type QuizScope = 'all' | 'today-sentences'
+type QuizScope = 'all' | 'today-sentences' | 'week'
 
 function clampCount(value: number) {
   if (!Number.isFinite(value)) return 15
@@ -47,7 +47,9 @@ export function TestPage() {
         setError(
           nextScope === 'today-sentences'
             ? '오늘 저장한 문장이 없거나, 보기를 만들 다른 문장이 없습니다.'
-            : '문장이나 단어를 적어도 두 개 이상 적어 주세요. 보기를 만들 재료가 없습니다.',
+            : nextScope === 'week'
+              ? '최근 일주일에 저장한 문장이나 단어가 없거나, 보기를 만들 재료가 없습니다.'
+              : '문장이나 단어를 적어도 두 개 이상 적어 주세요. 보기를 만들 재료가 없습니다.',
         )
         return
       }
@@ -134,8 +136,8 @@ export function TestPage() {
       <div>
         <p className="section-title kicker">test</p>
         <p className="meta mt-4">
-          적어 둔 문장과 단어로 객관식 {clampCount(questionCount)}문제를 냅니다. 시작하기는 오늘 문장을 섞고, 오늘
-          학습 문장 공부하기는 오늘 저장한 문장만 냅니다.
+          시작하기는 적어 둔 문장과 단어로 객관식 {clampCount(questionCount)}문제를 냅니다. 오늘 학습 문장 공부하기는
+          오늘 문장만, 최근 일주일 공부하기는 최근 7일 문장과 단어를 빠짐없이 한 번씩 냅니다.
         </p>
         <p className="mt-8 font-kr text-[15px] leading-relaxed text-ink/85">
           일본어를 보고 한글을 고르거나, 한글을 보고 일본어를 고릅니다. 틀리면 복습으로 들어가고 틀린 횟수가 남습니다.
@@ -169,6 +171,14 @@ export function TestPage() {
           >
             {loading && scope === 'today-sentences' ? '만드는 중' : '오늘 학습 문장 공부하기'}
           </button>
+          <button
+            type="button"
+            className="ink-btn-warn"
+            disabled={loading}
+            onClick={() => void start('week')}
+          >
+            {loading && scope === 'week' ? '만드는 중' : '최근 일주일 공부하기'}
+          </button>
         </div>
       </div>
     )
@@ -185,6 +195,12 @@ export function TestPage() {
           <>
             <span className="mx-2 opacity-50">/</span>
             오늘 문장
+          </>
+        )}
+        {scope === 'week' && (
+          <>
+            <span className="mx-2 opacity-50">/</span>
+            최근 일주일
           </>
         )}
       </p>

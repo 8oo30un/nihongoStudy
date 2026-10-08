@@ -1,5 +1,5 @@
 import { db, type SentenceRow, type VocabRow } from './db.js'
-import { todaySeoul } from './util.js'
+import { addDays, todaySeoul } from './util.js'
 
 export type QuizKind = 'sentence' | 'vocab'
 export type QuizDirection = 'jp-ko' | 'ko-jp'
@@ -62,7 +62,7 @@ function buildQuestion(
   }
 }
 
-export type QuizScope = 'all' | 'today-sentences'
+export type QuizScope = 'all' | 'today-sentences' | 'week'
 
 export async function buildQuiz(
   limit = 15,
@@ -105,6 +105,23 @@ export async function buildQuiz(
 
   const todaySentences = shuffle(sentences.filter((row) => row.created_on === today))
   const todayVocab = shuffle(vocab.filter((row) => row.created_on === today))
+
+  const weekFrom = addDays(today, -6, options.timezone)
+  const weekSentences = shuffle(sentences.filter((row) => row.created_on >= weekFrom))
+  const weekVocab = shuffle(vocab.filter((row) => row.created_on >= weekFrom))
+
+  if (options.scope === 'week') {
+    const picked: QuizQuestion[] = []
+    for (const row of weekSentences) {
+      const pick = shuffle(questionsForSentence(row))[0]
+      if (pick) picked.push(pick)
+    }
+    for (const row of weekVocab) {
+      const pick = shuffle(questionsForVocab(row))[0]
+      if (pick) picked.push(pick)
+    }
+    return shuffle(picked)
+  }
 
   if (options.scope === 'today-sentences') {
     const picked: QuizQuestion[] = []

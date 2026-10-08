@@ -96,9 +96,9 @@ export const api = {
     request<MeaningSuggest>(
       `/api/suggest?q=${encodeURIComponent(q)}${kind ? `&kind=${kind}` : ''}`,
     ),
-  quiz: (count = 15, scope?: 'all' | 'today-sentences') => {
+  quiz: (count = 15, scope?: 'all' | 'today-sentences' | 'week') => {
     const params = new URLSearchParams({ count: String(count) })
-    if (scope === 'today-sentences') params.set('scope', scope)
+    if (scope === 'today-sentences' || scope === 'week') params.set('scope', scope)
     return request<{ questions: QuizQuestion[] }>(`/api/quiz?${params}`)
   },
   gradeQuiz: (body: {
